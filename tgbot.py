@@ -13,19 +13,15 @@ from telegram.ext import (
 from google import genai
 from google.genai.errors import APIError
 
-# Настройка логирования
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
 # ====================================================================
-# ⚠️ ВАЖНО: ВСТАВЬТЕ ВАШИ КЛЮЧИ СЮДА
-# ====================================================================
 TELEGRAM_TOKEN = "8454613915:AAFP79UgbFN_9oK3d_uhcnxo1We4b5VSla4" 
 GEMINI_API_KEY = "AIzaSyDuRJ6SBt7_gTbgQ15KlckbQfyrCA-S41c"
 # ====================================================================
 
-# 1. Определение состояний (State Machine)
 (
     ASK_CAMERA,
     ASK_BUDGET,
@@ -50,13 +46,7 @@ except Exception as e:
     logging.error(f"Ошибка инициализации Gemini клиента: {e}")
     exit()
 
-
-# ------------------------------------
-# 2. ФУНКЦИИ ДЛЯ СОЗДАНИЯ КЛАВИАТУР
-# ------------------------------------
-
 def get_purpose_keyboard():
-    """Выбор: для соц сетей, для работы, просто чтоб звонить, для игр, без разницы"""
     keyboard = [
         [InlineKeyboardButton("Соцсети", callback_data="Соцсети")],
         [InlineKeyboardButton("Работа", callback_data="Работа")],
@@ -67,13 +57,11 @@ def get_purpose_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 def get_camera_keyboard():
-    """Клавиатура с цифрами от 1 до 10"""
     row1 = [InlineKeyboardButton(str(i), callback_data=str(i)) for i in range(1, 6)]
     row2 = [InlineKeyboardButton(str(i), callback_data=str(i)) for i in range(6, 11)]
     return InlineKeyboardMarkup([row1, row2])
 
 def get_budget_keyboard():
-    """Варианты бюджета"""
     keyboard = [
         [InlineKeyboardButton("< 10 000 ₽", callback_data="до 10000")],
         [InlineKeyboardButton("10 000 - 25 000 ₽", callback_data="10000-25000")],
@@ -84,7 +72,6 @@ def get_budget_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 def get_priority_keyboard():
-    """Варианты приоритетов"""
     keyboard = [
         [InlineKeyboardButton("Удобство", callback_data="Удобство"),
          InlineKeyboardButton("Надежность", callback_data="Надежность")],
@@ -96,7 +83,6 @@ def get_priority_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 def get_size_keyboard():
-    """Размер телефона"""
     keyboard = [
         [InlineKeyboardButton("Маленький", callback_data="Маленький")],
         [InlineKeyboardButton("Средний", callback_data="Средний")],
@@ -106,7 +92,6 @@ def get_size_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 def get_os_keyboard():
-    """Операционная система"""
     keyboard = [
         [InlineKeyboardButton("iOS (Apple)", callback_data="iOS")],
         [InlineKeyboardButton("Android", callback_data="Android")],
@@ -115,7 +100,6 @@ def get_os_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 def get_ecosystem_keyboard():
-    """Популярные бренды с экосистемами"""
     keyboard = [
         [InlineKeyboardButton("Apple", callback_data="Apple")],
         [InlineKeyboardButton("Samsung", callback_data="Samsung")],
@@ -125,12 +109,9 @@ def get_ecosystem_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# ------------------------------------
-# 3. ХЕНДЛЕРЫ ДИАЛОГА
-# ------------------------------------
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обрабатывает команду /start и начинает диалог (вопрос 1)"""
     context.user_data.clear() 
 
     question = "🤖 Привет! Я твой личный консультант по подбору телефонов на базе Gemini. Начнем. \n\n<b>1. Для чего вы собираетесь использовать телефон?</b>"
@@ -234,7 +215,6 @@ async def ask_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return END
 
 async def send_to_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Последний шаг: собирает данные, формирует промпт и вызывает Gemini API"""
 
     user_add = update.message.text if update.message.text else "Ничего не уточнено."
     context.user_data["add"] = user_add
@@ -243,7 +223,6 @@ async def send_to_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     await update.message.reply_text("🧠 <b>Отлично, данные собраны!</b> \n\n<i>Идет подбор 5 лучших моделей с кратким описанием...</i>", parse_mode="HTML")
 
-    # Формирование промпта
     prompt = f"""Представь что ты самый лучший консультант в мире и подбери телефон для клиента используя эти параметры:
 Я собираюсь использовать телефон для: {data.get('purpose', 'Не указано')},
 Для меня качество съемки важно на: {data.get('camera_importance', '5')} из 10,
@@ -258,25 +237,16 @@ async def send_to_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 """
 
     try:
-        # Вызов Gemini API
         response = gemini_client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
         )
 
-        # === РЕАЛИЗАЦИЯ ВАРИАНТА 2: HTML-ПАРСИНГ ДЛЯ НАДЕЖНОСТИ ===
-        
-        # 1. Заменяем жирный Markdown (**текст**) на жирный HTML (<b>текст</b>)
-        # Это помогает избежать ошибок парсинга Markdown в Telegram.
-        # Используем простую замену, что достаточно для большинства ответов Gemini.
         formatted_text = response.text.replace('**', '<b>').replace('<b>', '</b>', 1) 
-        # Дополнительно экранируем символы < и > для предотвращения проблем с HTML
         formatted_text = formatted_text.replace('<', '&lt;').replace('>', '&gt;').replace('<b>', '<b>').replace('</b>', '</b>')
         
-        # Заголовок также делаем HTML
         result_text = f"✅ <b>Результат подбора от консультанта Gemini:</b>\n\n{formatted_text}"
 
-        # 2. Отправка результата пользователю с parse_mode="HTML"
         await update.message.reply_text(result_text, parse_mode="HTML")
 
     except APIError as e:
@@ -290,19 +260,13 @@ async def send_to_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обрабатывает команду /cancel и завершает диалог"""
     await update.message.reply_text(
         'Консультация прервана. Начните снова с команды /start.',
     )
     return ConversationHandler.END
 
 
-# ------------------------------------
-# 4. ОСНОВНАЯ ФУНКЦИЯ ЗАПУСКА
-# ------------------------------------
-
 def main() -> None:
-    """Запускает бота."""
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
     conv_handler = ConversationHandler(
@@ -326,4 +290,5 @@ def main() -> None:
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
+
     main()
