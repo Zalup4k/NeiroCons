@@ -18,8 +18,7 @@ logging.basicConfig(
 )
 
 # ====================================================================
-TELEGRAM_TOKEN = "8454613915:AAFP79UgbFN_9oK3d_uhcnxo1We4b5VSla4" 
-GEMINI_API_KEY = "AIzaSyDuRJ6SBt7_gTbgQ15KlckbQfyrCA-S41c"
+
 # ====================================================================
 
 (
